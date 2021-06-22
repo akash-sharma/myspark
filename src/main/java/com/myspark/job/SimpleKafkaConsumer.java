@@ -19,87 +19,92 @@ public class SimpleKafkaConsumer {
   public static void main(String args[]) {
     LOGGER.info("spark program started");
 
-    SparkSession spark = SparkSession.builder().getOrCreate();
+    SparkSession spark = null;
+    try {
 
-    /*
-     * -----------------------------------------------------------------------------
-     * 1. kafka datasource
-     * https://spark.apache.org/docs/latest/structured-streaming-kafka-integration.html
-     * -----------------------------------------------------------------------------
-     */
-    Map<String, String> kafkaOptions = new HashMap<>();
-    kafkaOptions.put("kafka.bootstrap.servers", "localhost:9092");
-    kafkaOptions.put("subscribePattern", "myTopicName");
-    kafkaOptions.put("startingoffsets", "");
-    kafkaOptions.put("kafka.max.partition.fetch.bytes", "10000");
-    kafkaOptions.put(
-        "spark.kafka.key.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
-    kafkaOptions.put(
-        "spark.kafka.value.deserializer",
-        "org.apache.kafka.common.serialization.StringDeserializer");
+      spark = SparkSession.builder().getOrCreate();
 
-    Dataset<Row> df = spark.readStream().format("kafka").options(kafkaOptions).load();
+      /*
+       * -----------------------------------------------------------------------------
+       * 1. kafka datasource
+       * https://spark.apache.org/docs/latest/structured-streaming-kafka-integration.html
+       * -----------------------------------------------------------------------------
+       */
+      Map<String, String> kafkaOptions = new HashMap<>();
+      kafkaOptions.put("kafka.bootstrap.servers", "localhost:9092");
+      kafkaOptions.put("subscribePattern", "myTopicName");
+      kafkaOptions.put("startingoffsets", "");
+      kafkaOptions.put("kafka.max.partition.fetch.bytes", "10000");
+      kafkaOptions.put(
+          "spark.kafka.key.deserializer",
+          "org.apache.kafka.common.serialization.StringDeserializer");
+      kafkaOptions.put(
+          "spark.kafka.value.deserializer",
+          "org.apache.kafka.common.serialization.StringDeserializer");
 
-    df.printSchema();
+      Dataset<Row> df = spark.readStream().format("kafka").options(kafkaOptions).load();
+      df.printSchema();
+      df =
+          df.selectExpr(
+              "CAST(key AS STRING) as key ",
+              "CAST(value AS STRING) as value",
+              "partition",
+              "offset");
+      df.createOrReplaceTempView("PIPELINE_1");
+      df.printSchema();
 
-    df =
-        df.selectExpr(
-            "CAST(key AS STRING) as key ",
-            "CAST(value AS STRING) as value",
-            "partition",
-            "offset",
-            "timestamp");
+      /*
+       * -----------------------------------------------------------------------------
+       * 2. kafka value, Stringified Json to columns
+       * -----------------------------------------------------------------------------
+       */
+      String jsonTranformerSql =
+          "SELECT cols.* from PIPELINE_1 P1  LATERAL VIEW "
+              + " json_tuple(P1.value,'customer_id','order_id','created_at','client') cols "
+              + " as customer_id,order_id,created_at,client WHERE value is not null ";
 
-    df.createOrReplaceTempView("PIPELINE_1");
-    df.printSchema();
+      Dataset<Row> stringToMapDs = spark.sql(jsonTranformerSql);
+      stringToMapDs.createOrReplaceTempView("PIPELINE_2");
+      stringToMapDs.printSchema();
 
-    /*
-     * -----------------------------------------------------------------------------
-     * 2. kafka value, Stringified Json to columns
-     * -----------------------------------------------------------------------------
-     */
-    String jsonTranformerSql =
-        "SELECT cols.* from PIPELINE_1 t1  LATERAL VIEW "
-            + " json_tuple(t1.value,'user_id','code','site_id','updated_at','type','client','metadata') cols "
-            + " as user_id,code,site_id,updated_at,type,client,metadata WHERE value is not null ";
+      /*
+       * -----------------------------------------------------------------------------
+       * Sql column mapper and filter
+       * -----------------------------------------------------------------------------
+       */
+      String columnMapperSql =
+          "select customer_id,order_id,created_at,client "
+              + " from PIPELINE_2 WHERE customer_id is not null AND order_id is not null ";
 
-    Dataset<Row> stringToMapDs = spark.sql(jsonTranformerSql);
+      Dataset<Row> sqlMapperFilterDs = spark.sql(columnMapperSql);
+      sqlMapperFilterDs.createOrReplaceTempView("PIPELINE_3");
+      sqlMapperFilterDs.printSchema();
 
-    stringToMapDs.createOrReplaceTempView("PIPELINE_2");
-    stringToMapDs.printSchema();
+      /*
+       * -----------------------------------------------------------------------------
+       * Data transformer
+       * https://stackoverflow.com/questions/21185092/apache-spark-map-vs-mappartitions
+       * -----------------------------------------------------------------------------
+       */
+      Dataset dataTransformerDs = spark.table("PIPELINE_3");
+      Dataset mappedDs =
+          dataTransformerDs.mapPartitions(
+              new SimplePartitionsFunction(), Encoders.bean(SimpleConsumerOutputDto.class));
+      mappedDs.createOrReplaceTempView("PIPELINE_4");
+      mappedDs.printSchema();
 
-    /*
-     * -----------------------------------------------------------------------------
-     * Sql column mapper and filter
-     * -----------------------------------------------------------------------------
-     */
-    String columnMapperSql =
-        "select user_id as userId, code, site_id, updated_at, type, client, metadata "
-            + " from PIPELINE_2 WHERE code is not null AND site_id is not null ";
+      /*
+       * -----------------------------------------------------------------------------
+       * Data sync, cassandra, ES, kafka
+       * -----------------------------------------------------------------------------
+       */
 
-    Dataset<Row> sqlMapperFilterDs = spark.sql(columnMapperSql);
-
-    sqlMapperFilterDs.createOrReplaceTempView("PIPELINE_3");
-    sqlMapperFilterDs.printSchema();
-
-    /*
-     * -----------------------------------------------------------------------------
-     * Data transformer
-     * https://stackoverflow.com/questions/21185092/apache-spark-map-vs-mappartitions
-     * -----------------------------------------------------------------------------
-     */
-    Dataset dataTransformerDs = spark.table("PIPELINE_3");
-    Dataset mappedDs =
-        dataTransformerDs.mapPartitions(
-            new SimplePartitionsFunction(), Encoders.bean(SimpleConsumerOutputDto.class));
-
-    mappedDs.createOrReplaceTempView("PIPELINE_4");
-    mappedDs.printSchema();
-
-    /*
-     * -----------------------------------------------------------------------------
-     * Data sync, cassandra, ES, kafka
-     * -----------------------------------------------------------------------------
-     */
+    } catch (Exception e) {
+      LOGGER.error("error occurred in SimpleKafkaConsumer ", e);
+    } finally {
+      if (spark != null) {
+        spark.close();
+      }
+    }
   }
 }
