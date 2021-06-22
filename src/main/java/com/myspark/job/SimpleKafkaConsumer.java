@@ -2,10 +2,15 @@ package com.myspark.job;
 
 import com.myspark.dto.SimpleConsumerOutputDto;
 import com.myspark.functions.SimplePartitionsFunction;
+import com.myspark.writer.ESBatchWriter;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Encoders;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
+import org.apache.spark.sql.streaming.DataStreamWriter;
+import org.apache.spark.sql.streaming.SourceProgress;
+import org.apache.spark.sql.streaming.StreamingQuery;
+import org.apache.spark.sql.streaming.StreamingQueryProgress;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -95,9 +100,37 @@ public class SimpleKafkaConsumer {
 
       /*
        * -----------------------------------------------------------------------------
-       * Data sync, cassandra, ES, kafka
+       * Data sync to ES
        * -----------------------------------------------------------------------------
        */
+      DataStreamWriter<Row> dataStreamWriter = spark.table("PIPELINE_4").writeStream();
+      ESBatchWriter writer = new ESBatchWriter();
+
+      // when you want to write data on console
+      // dataStreamWriter = dataStreamWriter.format("console");
+      // dataStreamWriter = dataStreamWriter.option("truncate", "false");
+
+      dataStreamWriter = dataStreamWriter.foreach(writer);
+      StreamingQuery streamingQuery = dataStreamWriter.start();
+
+      try {
+        streamingQuery.awaitTermination(100);
+      } catch (Exception e) {
+        LOGGER.error("received exception : ", e);
+        throw new RuntimeException("exception in awaitTermination", e);
+      }
+
+      StreamingQueryProgress streamingQueryProgress = streamingQuery.lastProgress();
+      if (streamingQueryProgress != null) {
+        String consumerName = streamingQueryProgress.name();
+        String timestamp = streamingQueryProgress.timestamp();
+        SourceProgress[] sources = streamingQueryProgress.sources();
+
+        Map<String, Long> durationMs = streamingQueryProgress.durationMs();
+        Double inputRowsPerSecond = streamingQueryProgress.inputRowsPerSecond();
+        Long inputRows = streamingQueryProgress.numInputRows();
+        Double processedRowsPerSecond = streamingQueryProgress.processedRowsPerSecond();
+      }
 
     } catch (Exception e) {
       LOGGER.error("error occurred in SimpleKafkaConsumer ", e);
