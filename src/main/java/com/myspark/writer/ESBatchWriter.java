@@ -1,23 +1,27 @@
 package com.myspark.writer;
 
 import com.myspark.job.SimpleKafkaConsumer;
+import com.myspark.util.DateUtil;
 import org.apache.spark.TaskContext;
 import org.apache.spark.sql.ForeachWriter;
 import org.apache.spark.sql.Row;
+import org.apache.spark.sql.types.DataType;
+import org.apache.spark.sql.types.DataTypes;
+import org.apache.spark.sql.types.StructField;
+import org.apache.spark.sql.types.StructType;
 import org.elasticsearch.ElasticsearchException;
 import org.elasticsearch.action.bulk.BulkItemResponse;
 import org.elasticsearch.action.bulk.BulkRequest;
 import org.elasticsearch.action.bulk.BulkResponse;
+import org.elasticsearch.action.index.IndexRequest;
 import org.elasticsearch.client.RequestOptions;
 import org.elasticsearch.client.RestHighLevelClient;
+import org.elasticsearch.common.unit.TimeValue;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class ESBatchWriter extends ForeachWriter<Row> {
@@ -45,15 +49,20 @@ public class ESBatchWriter extends ForeachWriter<Row> {
     List<Map<String, Object>> recordList =
         partitionIdByBatchedPacketMap.get(TaskContext.getPartitionId());
 
-    Map<String, Object> record = new LinkedHashMap<>();
-    // TODO : add to record
+    Map<String, Object> record = new HashMap<>();
+    populateRecord(row, record);
     recordList.add(record);
 
     // send batch packets
     if (recordList.size() >= BATCH_COUNT) {
-      RestHighLevelClient restHighLevelClient = ESClientUtils.getInstance();
       BulkRequest bulkRequest = new BulkRequest();
-      // TODO : add to bulk request
+      for (Iterator iterator = recordList.iterator(); iterator.hasNext(); ) {
+        Map<String, Object> recordMap = (Map<String, Object>) iterator.next();
+        LOGGER.info(recordMap.toString());
+        bulkRequest.add(getIndexRequest(recordMap));
+      }
+
+      RestHighLevelClient restHighLevelClient = ESClientUtils.getInstance();
       try {
         BulkResponse bulkResponse = restHighLevelClient.bulk(bulkRequest, RequestOptions.DEFAULT);
         LOGGER.info(
@@ -86,8 +95,8 @@ public class ESBatchWriter extends ForeachWriter<Row> {
         LOGGER.error("ES batch operation failed", e);
         throw new ElasticsearchException("ES batch operation failed", e);
       }
+      recordList.clear();
     }
-    recordList.clear();
   }
 
   @Override
@@ -95,5 +104,45 @@ public class ESBatchWriter extends ForeachWriter<Row> {
     List<Map<String, Object>> batchedPackets =
         partitionIdByBatchedPacketMap.get(TaskContext.getPartitionId());
     batchedPackets.clear();
+  }
+
+  private void populateRecord(Row row, Map<String, Object> record) {
+
+    StructType schema = row.schema();
+    StructField[] fields = schema.fields();
+    for (int index = 0; index < fields.length; index++) {
+      String columnName = fields[index].name();
+      Object value = row.get(index);
+      if (value != null) {
+        DataType dataType = fields[index].dataType();
+        if (dataType == DataTypes.LongType || dataType == DataTypes.IntegerType) {
+          record.put(columnName, ((Number) value).longValue());
+        } else if (dataType == DataTypes.DoubleType || dataType == DataTypes.FloatType) {
+          record.put(columnName, ((Number) value).doubleValue());
+        } else if (dataType == DataTypes.StringType) {
+          record.put(columnName, value.toString());
+        } else if (dataType == DataTypes.TimestampType || dataType == DataTypes.DateType) {
+          Long timestamp = row.getTimestamp(index).getTime();
+          String zonedDateTime = DateUtil.getZonedDateTime(timestamp);
+          record.put(columnName, zonedDateTime);
+        } else {
+          record.put(columnName, value);
+        }
+      } else {
+        record.put(columnName, null);
+      }
+    }
+  }
+
+  private IndexRequest getIndexRequest(Map<String, Object> recordMap) {
+
+    String customerId = recordMap.get("customer_id").toString();
+    TimeValue timeoutValue = TimeValue.timeValueSeconds(1);
+
+    IndexRequest indexRequest = new IndexRequest("myIndexName", "esTypeName", customerId);
+    indexRequest.source(recordMap);
+    indexRequest.routing(customerId);
+    indexRequest.timeout(timeoutValue);
+    return indexRequest;
   }
 }
