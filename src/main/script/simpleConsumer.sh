@@ -1,11 +1,9 @@
 #!/bin/sh
 
+export HADOOP_USER_NAME=hdfs
 export SPARK_MAJOR_VERSION=2
 
-# Command to remove the old configuration from HDFS
 
-
-# Execute below spark command
 spark-submit \
  --conf spark.app.name=Simple_Kafka_Consumer \
  --driver-memory 512m \
