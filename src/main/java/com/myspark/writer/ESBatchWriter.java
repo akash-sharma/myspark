@@ -58,7 +58,7 @@ public class ESBatchWriter extends ForeachWriter<Row> {
       BulkRequest bulkRequest = new BulkRequest();
       for (Iterator iterator = recordList.iterator(); iterator.hasNext(); ) {
         Map<String, Object> recordMap = (Map<String, Object>) iterator.next();
-        LOGGER.info(recordMap.toString());
+        LOGGER.info("recordMap : {}", recordMap);
         bulkRequest.add(getIndexRequest(recordMap));
       }
 
@@ -136,7 +136,10 @@ public class ESBatchWriter extends ForeachWriter<Row> {
 
   private IndexRequest getIndexRequest(Map<String, Object> recordMap) {
 
-    String customerId = recordMap.get("customer_id").toString();
+    String customerId = (String) recordMap.get("customer_id");
+    if (customerId == null) {
+      customerId = "1234567";
+    }
     TimeValue timeoutValue = TimeValue.timeValueSeconds(1);
 
     IndexRequest indexRequest = new IndexRequest("myIndexName", "esTypeName", customerId);

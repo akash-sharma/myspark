@@ -37,8 +37,8 @@ public class SimpleKafkaConsumer {
        */
       Map<String, String> kafkaOptions = new HashMap<>();
       kafkaOptions.put("kafka.bootstrap.servers", "localhost:9092");
-      kafkaOptions.put("subscribePattern", "myTopicName");
-      kafkaOptions.put("startingoffsets", "");
+      kafkaOptions.put("subscribePattern", "myspark");
+      kafkaOptions.put("startingoffsets", "latest");
       kafkaOptions.put("kafka.max.partition.fetch.bytes", "10000");
       kafkaOptions.put(
           "spark.kafka.key.deserializer",
@@ -113,25 +113,27 @@ public class SimpleKafkaConsumer {
       dataStreamWriter = dataStreamWriter.foreach(writer);
       StreamingQuery streamingQuery = dataStreamWriter.start();
 
-      try {
-        streamingQuery.awaitTermination(100);
-      } catch (Exception e) {
-        LOGGER.error("received exception : ", e);
-        throw new RuntimeException("exception in awaitTermination", e);
-      }
+      while (true) {
+        try {
+          streamingQuery.awaitTermination(100);
+        } catch (Exception e) {
+          LOGGER.error("received exception : ", e);
+          throw new RuntimeException("exception in awaitTermination", e);
+        }
 
-      StreamingQueryProgress streamingQueryProgress = streamingQuery.lastProgress();
-      LOGGER.info("logger streamingQueryProgress : {}", streamingQueryProgress);
-      System.out.println("sys streamingQueryProgress : " + streamingQueryProgress);
-      if (streamingQueryProgress != null) {
-        String consumerName = streamingQueryProgress.name();
-        String timestamp = streamingQueryProgress.timestamp();
-        SourceProgress[] sources = streamingQueryProgress.sources();
+        StreamingQueryProgress streamingQueryProgress = streamingQuery.lastProgress();
+        LOGGER.info("logger streamingQueryProgress : {}", streamingQueryProgress);
+        System.out.println("sys streamingQueryProgress : " + streamingQueryProgress);
+        if (streamingQueryProgress != null) {
+          String consumerName = streamingQueryProgress.name();
+          String timestamp = streamingQueryProgress.timestamp();
+          SourceProgress[] sources = streamingQueryProgress.sources();
 
-        Map<String, Long> durationMs = streamingQueryProgress.durationMs();
-        Double inputRowsPerSecond = streamingQueryProgress.inputRowsPerSecond();
-        Long inputRows = streamingQueryProgress.numInputRows();
-        Double processedRowsPerSecond = streamingQueryProgress.processedRowsPerSecond();
+          Map<String, Long> durationMs = streamingQueryProgress.durationMs();
+          Double inputRowsPerSecond = streamingQueryProgress.inputRowsPerSecond();
+          Long inputRows = streamingQueryProgress.numInputRows();
+          Double processedRowsPerSecond = streamingQueryProgress.processedRowsPerSecond();
+        }
       }
 
     } catch (Exception e) {
@@ -143,3 +145,16 @@ public class SimpleKafkaConsumer {
     }
   }
 }
+
+/*
+ * -----------------------------------------------------------------------------
+ * KAFKA_HOME/bin/kafka-topics.sh --create --zookeeper <broker_ip>:2181
+ *   --replication-factor 1 --partitions 1 --topic myspark --config retention.ms=2592000000
+ *
+ *
+ * KAFKA_HOME/bin/kafka-console-producer.sh --broker-list <broker_ip>:9092
+ *   --topic myspark --property "parse.key=true" --property "key.separator=::"
+ * > key::{"customer_id":123,"order_id":"123AB","created_at":"Fri Jun 25 21:46:01 IST 2021", "client":"ABC"}
+ *
+ * -----------------------------------------------------------------------------
+ */

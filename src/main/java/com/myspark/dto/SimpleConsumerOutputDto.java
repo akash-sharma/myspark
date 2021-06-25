@@ -1,17 +1,23 @@
 package com.myspark.dto;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 import java.io.Serializable;
 
 public class SimpleConsumerOutputDto implements Serializable {
 
   private static final long serialVersionUID = 152988091560L;
 
+  @JsonProperty("customer_id")
   private Integer customerId;
 
+  @JsonProperty("order_id")
   private String orderId;
 
+  @JsonProperty("created_at")
   private String createdAt;
 
+  @JsonProperty("client")
   private String client;
 
   private String packetProcessingTime;
