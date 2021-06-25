@@ -89,7 +89,8 @@ public class ESBatchWriter extends ForeachWriter<Row> {
                   + allResponses[i].getOpType());
         }
         if (bulkResponse.hasFailures()) {
-          throw new ElasticsearchException("ES batch Indexing has failed");
+          throw new ElasticsearchException(
+              "ES batch Indexing has failed with msg : " + bulkResponse.buildFailureMessage());
         }
       } catch (IOException e) {
         LOGGER.error("ES batch operation failed", e);
@@ -138,7 +139,10 @@ public class ESBatchWriter extends ForeachWriter<Row> {
 
     String customerId = (String) recordMap.get("customer_id");
     if (customerId == null) {
-      customerId = "1234567";
+      customerId = (String) recordMap.get("customerId");
+      if (customerId == null) {
+        customerId = "1234567";
+      }
     }
     TimeValue timeoutValue = TimeValue.timeValueSeconds(1);
 
