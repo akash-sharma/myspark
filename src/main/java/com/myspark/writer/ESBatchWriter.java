@@ -46,12 +46,14 @@ public class ESBatchWriter extends ForeachWriter<Row> {
   @Override
   public void process(Row row) {
 
+    LOGGER.info("row in ESBatchWriter {}", row);
     List<Map<String, Object>> recordList =
         partitionIdByBatchedPacketMap.get(TaskContext.getPartitionId());
 
     Map<String, Object> record = new HashMap<>();
     populateRecord(row, record);
     recordList.add(record);
+    LOGGER.info("recordList : {}", recordList);
 
     // send batch packets
     if (recordList.size() >= BATCH_COUNT) {
@@ -110,7 +112,9 @@ public class ESBatchWriter extends ForeachWriter<Row> {
   private void populateRecord(Row row, Map<String, Object> record) {
 
     StructType schema = row.schema();
+    LOGGER.info("schema : {}", schema);
     StructField[] fields = schema.fields();
+    LOGGER.info("fields : {}", fields);
     for (int index = 0; index < fields.length; index++) {
       String columnName = fields[index].name();
       Object value = row.get(index);
@@ -146,7 +150,7 @@ public class ESBatchWriter extends ForeachWriter<Row> {
     }
     TimeValue timeoutValue = TimeValue.timeValueSeconds(1);
 
-    IndexRequest indexRequest = new IndexRequest("myIndexName", "esTypeName", customerId);
+    IndexRequest indexRequest = new IndexRequest("myindexname", "esTypeName", customerId);
     indexRequest.source(recordMap);
     indexRequest.routing(customerId);
     indexRequest.timeout(timeoutValue);
