@@ -121,6 +121,8 @@ public class SimpleKafkaConsumer {
       }
 
       StreamingQueryProgress streamingQueryProgress = streamingQuery.lastProgress();
+      LOGGER.info("logger streamingQueryProgress : {}", streamingQueryProgress);
+      System.out.println("sys streamingQueryProgress : " + streamingQueryProgress);
       if (streamingQueryProgress != null) {
         String consumerName = streamingQueryProgress.name();
         String timestamp = streamingQueryProgress.timestamp();
