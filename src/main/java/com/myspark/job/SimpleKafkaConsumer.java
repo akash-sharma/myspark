@@ -38,7 +38,7 @@ public class SimpleKafkaConsumer {
       Map<String, String> kafkaOptions = new HashMap<>();
       kafkaOptions.put("kafka.bootstrap.servers", "localhost:9092");
       kafkaOptions.put("subscribePattern", "myspark");
-      kafkaOptions.put("startingoffsets", "latest");
+      kafkaOptions.put("startingoffsets", "latest");    // earliest
       kafkaOptions.put("kafka.max.partition.fetch.bytes", "10000");
       kafkaOptions.put(
           "spark.kafka.key.deserializer",

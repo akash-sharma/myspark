@@ -51,7 +51,9 @@ public class SimplePartitionsFunction
               custIdAsInt, orderId, createdAt, client, packetProcessingTime);
       LOGGER.info("simpleConsumerOutputDto : {}", simpleConsumerOutputDto);
 
-      resultList.add(simpleConsumerOutputDto);
+      if (simpleConsumerOutputDto != null) {
+        resultList.add(simpleConsumerOutputDto);
+      }
     }
 
     return resultList.iterator();
