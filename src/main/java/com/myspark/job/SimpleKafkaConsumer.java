@@ -3,14 +3,12 @@ package com.myspark.job;
 import com.myspark.dto.SimpleConsumerOutputDto;
 import com.myspark.functions.SimplePartitionsFunction;
 import com.myspark.writer.ESBatchWriter;
+import com.myspark.writer.ESClientUtils;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Encoders;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
-import org.apache.spark.sql.streaming.DataStreamWriter;
-import org.apache.spark.sql.streaming.SourceProgress;
-import org.apache.spark.sql.streaming.StreamingQuery;
-import org.apache.spark.sql.streaming.StreamingQueryProgress;
+import org.apache.spark.sql.streaming.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -103,14 +101,20 @@ public class SimpleKafkaConsumer {
        * Data sync to ES
        * -----------------------------------------------------------------------------
        */
-      DataStreamWriter<Row> dataStreamWriter = spark.table("PIPELINE_4").writeStream();
+      ESClientUtils.getInstance();
       ESBatchWriter writer = new ESBatchWriter();
+      DataStreamWriter<Row> dataStreamWriter = spark.table("PIPELINE_4").writeStream();
 
       // when you want to write data on console
       // dataStreamWriter = dataStreamWriter.format("console");
       // dataStreamWriter = dataStreamWriter.option("truncate", "false");
 
       dataStreamWriter = dataStreamWriter.foreach(writer);
+
+      dataStreamWriter = dataStreamWriter.trigger(Trigger.ProcessingTime(2000));
+      dataStreamWriter = dataStreamWriter.outputMode("append");
+      dataStreamWriter = dataStreamWriter.queryName("PIPELINE_5");
+
       StreamingQuery streamingQuery = dataStreamWriter.start();
 
       while (true) {

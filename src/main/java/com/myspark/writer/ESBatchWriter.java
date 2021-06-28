@@ -1,6 +1,5 @@
 package com.myspark.writer;
 
-import com.myspark.job.SimpleKafkaConsumer;
 import com.myspark.util.DateUtil;
 import org.apache.spark.TaskContext;
 import org.apache.spark.sql.ForeachWriter;
@@ -27,7 +26,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public class ESBatchWriter extends ForeachWriter<Row> {
 
   private static final long serialVersionUID = 568213458L;
-  private static Logger LOGGER = LoggerFactory.getLogger(SimpleKafkaConsumer.class);
+  private static Logger LOGGER = LoggerFactory.getLogger(ESBatchWriter.class);
 
   private static final int BATCH_COUNT = 1; // 50
 
@@ -68,27 +67,24 @@ public class ESBatchWriter extends ForeachWriter<Row> {
       try {
         BulkResponse bulkResponse = restHighLevelClient.bulk(bulkRequest, RequestOptions.DEFAULT);
         LOGGER.info(
-            "After request took ms :"
-                + bulkResponse.getTook()
-                + " docs fails:"
-                + bulkResponse.hasFailures()
-                + " with msg"
-                + bulkResponse.buildFailureMessage());
+            "ES request time in ms : {}, hasFailures : {}, buildFailureMessage : {}",
+            bulkResponse.getTook(),
+            bulkResponse.hasFailures(),
+            bulkResponse.buildFailureMessage());
+        LOGGER.info("bulkResponse : {}", bulkResponse);
 
         BulkItemResponse[] allResponses = bulkResponse.getItems();
-        for (int i = 0; i < allResponses.length; i++) {
+        for (int index = 0; index < allResponses.length; index++) {
 
+          BulkItemResponse itemResponse = allResponses[index];
           LOGGER.info(
-              "record indexed with : "
-                  + allResponses[i].getIndex()
-                  + " type : "
-                  + allResponses[i].getType()
-                  + " id : "
-                  + allResponses[i].getId()
-                  + " version : "
-                  + allResponses[i].getFailure()
-                  + " with op"
-                  + allResponses[i].getOpType());
+              "Record indexed with : {}, type : {}, id : {}, failure : {}, operation : {}",
+              itemResponse.getIndex(),
+              itemResponse.getType(),
+              itemResponse.getId(),
+              itemResponse.getFailure(),
+              itemResponse.getOpType());
+          LOGGER.info("itemResponse : {}", itemResponse);
         }
         if (bulkResponse.hasFailures()) {
           throw new ElasticsearchException(
@@ -142,10 +138,13 @@ public class ESBatchWriter extends ForeachWriter<Row> {
   private IndexRequest getIndexRequest(Map<String, Object> recordMap) {
 
     String customerId = (String) recordMap.get("customer_id");
+    LOGGER.info("1. customer_id : {}", customerId);
     if (customerId == null) {
       customerId = (String) recordMap.get("customerId");
+      LOGGER.info("2. customerId : {}", customerId);
       if (customerId == null) {
         customerId = "1234567";
+        LOGGER.info("3. customer : {}", customerId);
       }
     }
     TimeValue timeoutValue = TimeValue.timeValueSeconds(1);
