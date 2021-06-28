@@ -28,16 +28,16 @@ public class SimplePartitionsFunction
   }
 
   @Override
-  public Iterator<SimpleConsumerOutputDto> call(Iterator<Row> input) throws Exception {
+  public Iterator<SimpleConsumerOutputDto> call(Iterator<Row> inputIterator) throws Exception {
 
     List<SimpleConsumerOutputDto> resultList = new LinkedList<>();
 
-    if (input == null) {
+    if (inputIterator == null) {
       return resultList.iterator();
     }
-    while (input.hasNext()) {
-      Row row = input.next();
-      LOGGER.info("SimpleConsumer input row: {}", row);
+    while (inputIterator.hasNext()) {
+      Row row = inputIterator.next();
+      LOGGER.info("SimpleConsumer inputIterator row: {}", row);
 
       String customerId = row.getString(row.fieldIndex("customer_id"));
       Integer custIdAsInt = Integer.parseInt(customerId);
@@ -55,6 +55,7 @@ public class SimplePartitionsFunction
         resultList.add(simpleConsumerOutputDto);
       }
     }
+    LOGGER.info("resultList : {}", resultList);
 
     return resultList.iterator();
   }
