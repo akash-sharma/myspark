@@ -137,21 +137,14 @@ public class ESBatchWriter extends ForeachWriter<Row> {
 
   private IndexRequest getIndexRequest(Map<String, Object> recordMap) {
 
-    String customerId = (String) recordMap.get("customer_id");
-    LOGGER.info("1. customer_id : {}", customerId);
-    if (customerId == null) {
-      customerId = (String) recordMap.get("customerId");
-      LOGGER.info("2. customerId : {}", customerId);
-      if (customerId == null) {
-        customerId = "1234567";
-        LOGGER.info("3. customer : {}", customerId);
-      }
-    }
+    Long customerId = (Long) recordMap.get("customerId");
+    String customerIdStr = customerId.toString();
+    LOGGER.info("customerId : {}", customerId);
     TimeValue timeoutValue = TimeValue.timeValueSeconds(1);
 
-    IndexRequest indexRequest = new IndexRequest("myindexname", "esTypeName", customerId);
+    IndexRequest indexRequest = new IndexRequest("myindexname", "esTypeName", customerIdStr);
     indexRequest.source(recordMap);
-    indexRequest.routing(customerId);
+    indexRequest.routing(customerIdStr);
     indexRequest.timeout(timeoutValue);
     return indexRequest;
   }

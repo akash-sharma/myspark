@@ -1,23 +1,17 @@
 package com.myspark.dto;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
-
 import java.io.Serializable;
 
 public class SimpleConsumerOutputDto implements Serializable {
 
   private static final long serialVersionUID = 152988091560L;
 
-  @JsonProperty("customer_id")
   private Integer customerId;
 
-  @JsonProperty("order_id")
   private String orderId;
 
-  @JsonProperty("created_at")
   private String createdAt;
 
-  @JsonProperty("client")
   private String client;
 
   private String packetProcessingTime;
@@ -55,6 +49,26 @@ public class SimpleConsumerOutputDto implements Serializable {
 
   public String getPacketProcessingTime() {
     return packetProcessingTime;
+  }
+
+  public void setCustomerId(Integer customerId) {
+    this.customerId = customerId;
+  }
+
+  public void setOrderId(String orderId) {
+    this.orderId = orderId;
+  }
+
+  public void setCreatedAt(String createdAt) {
+    this.createdAt = createdAt;
+  }
+
+  public void setClient(String client) {
+    this.client = client;
+  }
+
+  public void setPacketProcessingTime(String packetProcessingTime) {
+    this.packetProcessingTime = packetProcessingTime;
   }
 
   @Override

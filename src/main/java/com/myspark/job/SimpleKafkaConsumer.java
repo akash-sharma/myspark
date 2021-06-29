@@ -26,6 +26,7 @@ public class SimpleKafkaConsumer {
     try {
 
       spark = SparkSession.builder().getOrCreate();
+      // spark = SparkSession.builder().master("local[5]").getOrCreate();
 
       /*
        * -----------------------------------------------------------------------------
@@ -89,7 +90,7 @@ public class SimpleKafkaConsumer {
        * https://stackoverflow.com/questions/21185092/apache-spark-map-vs-mappartitions
        * -----------------------------------------------------------------------------
        */
-      Dataset dataTransformerDs = spark.table("PIPELINE_3");
+      Dataset<Row> dataTransformerDs = spark.table("PIPELINE_3");
       Dataset mappedDs =
           dataTransformerDs.mapPartitions(
               new SimplePartitionsFunction(), Encoders.bean(SimpleConsumerOutputDto.class));
