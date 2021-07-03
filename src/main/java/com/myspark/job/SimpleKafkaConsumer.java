@@ -36,15 +36,16 @@ public class SimpleKafkaConsumer {
        */
       Map<String, String> kafkaOptions = new HashMap<>();
       kafkaOptions.put("kafka.bootstrap.servers", "localhost:9092");
-      kafkaOptions.put("subscribePattern", "myspark");
-      kafkaOptions.put("startingoffsets", "latest"); // earliest
-      kafkaOptions.put("kafka.max.partition.fetch.bytes", "10000");
+      kafkaOptions.put("subscribePattern", "myspark");  // kafka topic name
       kafkaOptions.put(
           "spark.kafka.key.deserializer",
           "org.apache.kafka.common.serialization.StringDeserializer");
       kafkaOptions.put(
           "spark.kafka.value.deserializer",
           "org.apache.kafka.common.serialization.StringDeserializer");
+      kafkaOptions.put("startingOffsets", "latest"); // earliest
+      kafkaOptions.put("kafka.max.partition.fetch.bytes", "1000000");
+      kafkaOptions.put("kafkaConsumer.pollTimeoutMs", "120000");
 
       Dataset<Row> df = spark.readStream().format("kafka").options(kafkaOptions).load();
       df.printSchema();
